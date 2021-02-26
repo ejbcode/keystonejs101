@@ -1,18 +1,14 @@
 const dotenv = require('dotenv').config()
 const { Keystone } = require('@keystonejs/keystone');
+const { PasswordAuthStrategy }= require('@keystonejs/auth-password')
 const { GraphQLApp } = require('@keystonejs/app-graphql');
 const { AdminUIApp } = require('@keystonejs/app-admin-ui');
 const { MongooseAdapter: Adapter } = require('@keystonejs/adapter-mongoose');
 const PROJECT_NAME = 'keystone101';
-const adapterConfig = { mongoUri: process.env.MONGO_URI };
 const PostSchema = require('./lists/Post')
 const AuthorSchema = require('./lists/Author')
 const UserSchema = require('./lists/User')
 const TodoSchema = require('./lists/Todo')
-
-
-
-
 
 /**
  * You've got a new KeystoneJS Project! Things you might want to do next:
@@ -20,6 +16,7 @@ const TodoSchema = require('./lists/Todo')
  * - Select configure access control and authentication (See: https://keystonejs.com/api/access-control)
  */
 
+const adapterConfig = { mongoUri: process.env.MONGO_URI };
 
 const keystone = new Keystone({
   adapter: new Adapter(adapterConfig),
@@ -29,16 +26,31 @@ const keystone = new Keystone({
 keystone.createList('Post', PostSchema)
 keystone.createList('Authorz', AuthorSchema)
 keystone.createList('User', UserSchema)
-
-
 keystone.createList('Todo', TodoSchema);
 
+const authStrategy = keystone.createAuthStrategy({
+  type: PasswordAuthStrategy,
+  list: 'User',
+  config: {
+    identityField: 'email',
+    secretField: 'password',
+  },
+});
 
+const isAdmin =  ({ authentication: { item: user, listKey: list } }) => !!user && !!user.isAdmin
+
+const isLoggedIn =  ({ authentication: { item: user, listKey: list } }) => !!user && !!user.isAdmin
 
 
 module.exports = {
   keystone,
   apps: [
     new GraphQLApp(), 
-    new AdminUIApp({ name: PROJECT_NAME, enableDefaultRoute: true })],
+    new AdminUIApp({ 
+      name: PROJECT_NAME, 
+      enableDefaultRoute: true, 
+      authStrategy, 
+      isAccessAllowed: isAdmin
+    }),    
+  ],
 };

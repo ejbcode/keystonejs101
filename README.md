@@ -39,17 +39,114 @@ Once your project has been set up you should move into its directory so that you
 cd my-app
 npm run dev
 
-change the port 3000 for avoid futere problem with the frontend in the future
+change the port 3000 for avoid future problem with the frontend.
+
+### dotenv
 
 npm i dotenv
 
 create a .env file
 
+```JS
 MONGO_URI='mongodb+srv://USER:PASSWORD@keystonecluster.rlmni.mongodb.net/keystone101?retryWrites=true&w=majority'
-
 COOKIE_SECRET="literally anything you want"
+```
 
-IMPORT `const dotenv = require('dotenv').config()`
+```JS
+const dotenv = require('dotenv').config()
+
+const adapterConfig = { mongoUri: process.env.MONGO_URI };
+
+const keystone = new Keystone({
+  adapter: new Adapter(adapterConfig),
+  cookieSecret: process.env.COOKIE_SECRET
+});
+```
+
+## Adding lists
+
+Create a folder name **lists**, in this folder we gonna create the schemas into separete files.
+
+e.g:
+/lists/Posts.js
+
+```JS
+const { Text, Checkbox } = require('@keystonejs/fields');
+
+module.exports = {
+ fields: {
+   description: {
+     type: Text,
+     isRequired: true,
+   },
+   isComplete: {
+     type: Checkbox,
+     defaultValue: false,
+   },
+ },
+};
+```
+
+Here we described a very basic schema for a generic Todo list. Let's add it to our Keystone application. Inside of index.js import the defined schema.
+
+_index.js_
+
+```JS
+const TodoSchema = require('./lists/Todo.js');
+
+keystone.createList('Todo', TodoSchema);
+```
+
+## Relationships
+
+To do a relationships first you have to import the trupe Relationship from '@keystonejs/fields', and add it to the schema
+
+```JS
+assignee: {
+  type: Relationship,
+  ref: 'User.tasks',
+  many: false,
+  isRequired: true,
+}
+```
+
+And we could do a two-sided relationship between User and Todo
+
+_/lists/User.js_
+
+```JS
+const { Text, Checkbox, Password, Relationship} = require('@keystonejs/fields')
+
+const UserFields = {
+  fields: {
+    name: {
+      type: Text,
+      isRequired: true,
+    },
+    email: {
+      type: Text,
+      isRequired: true,
+      isUnique: true,
+    },
+    password: {
+      type: Password,
+      isRequired: true,
+    },
+    isAdmin: {
+      type: Checkbox,
+      isRequired: true,
+    },
+    tasks: {
+      type: Relationship,
+      ref: 'Todo.assignee',
+      many: true,
+    }
+  },
+}
+
+module.exports = UserFields
+
+```
 
 query bringData {
 allTodos {

@@ -1,6 +1,6 @@
-const { Text, Checkbox, Password } = require('@keystonejs/fields')
+const { Text, Checkbox, Password, Relationship} = require('@keystonejs/fields')
 
-const userFields = {
+const UserFields = {
   fields: {
     name: {
       type: Text,
@@ -18,8 +18,13 @@ const userFields = {
     isAdmin: {
       type: Checkbox,
       isRequired: true,
-    },
+    },  
+    tasks: {
+      type: Relationship,
+      ref: 'Todo.assignee',
+      many: true,
+    }
   },
 }
 
-module.exports = userFields
+module.exports = UserFields
