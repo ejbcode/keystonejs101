@@ -23,9 +23,30 @@ const keystone = new Keystone({
   cookieSecret: process.env.COOKIE_SECRET
 });
 
-keystone.createList('Post', PostSchema)
+const isAdmin =  ({ authentication: { item: user, listKey: list } }) => !!user && !!user.isAdmin
+
+const isLoggedIn =  ({ authentication: { item: user, listKey: list } }) => !!user
+
+keystone.createList('Post', {
+  fields: PostSchema.fields,
+  access: {
+    read: true,
+    create: isLoggedIn,
+    update: isLoggedIn,
+    delete: isLoggedIn,
+  },
+})
+
 keystone.createList('Authorz', AuthorSchema)
-keystone.createList('User', UserSchema)
+keystone.createList('User', {
+  fields: UserSchema.fields,
+  access: {
+    read: true,
+    create: isAdmin,
+    update: isAdmin,
+    delete: isAdmin,
+  },
+})
 keystone.createList('Todo', TodoSchema);
 
 const authStrategy = keystone.createAuthStrategy({
@@ -37,9 +58,6 @@ const authStrategy = keystone.createAuthStrategy({
   },
 });
 
-const isAdmin =  ({ authentication: { item: user, listKey: list } }) => !!user && !!user.isAdmin
-
-const isLoggedIn =  ({ authentication: { item: user, listKey: list } }) => !!user && !!user.isAdmin
 
 
 module.exports = {

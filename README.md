@@ -97,6 +97,31 @@ const TodoSchema = require('./lists/Todo.js');
 keystone.createList('Todo', TodoSchema);
 ```
 
+And each list can have as many fields as you need.
+
+Keystone will process each List, converting it into a series of GraphQL CRUD (Create, Read, Update, Delete) operations. For example, the above lists will generate:
+
+```GRAPHQL
+type Mutation {
+  createTodo(...): Todo
+  updateTodo(...): Todo
+  deleteTodo(...): Todo
+
+}
+
+type Query {
+  allTodos(...): [Todo]
+  Todo(...): Todo
+
+}
+
+type Todo {
+  id: ID
+  task: String
+}
+
+```
+
 ## Relationships
 
 To do a relationships first you have to import the trupe Relationship from '@keystonejs/fields', and add it to the schema
@@ -145,6 +170,152 @@ const UserFields = {
 }
 
 module.exports = UserFields
+
+```
+
+## Authentication in KeystoneJS
+
+You can set an access control to the AdminUI, and set another access control to restrict the API access
+
+### Logging in to the Admin UI
+
+You have to define which list is going to be use to login in the UI. For this example we going to use the user list
+Then we need to install.
+`npm i @keystonejs/auth-password`
+
+and then import it in the index file
+
+```JS
+//import PasswordAuthStrategy from @keystonejs/auth-password
+const { PasswordAuthStrategy } = require('@keystonejs/auth-password')
+
+//create the authStrategy. We define which list and what are the
+// params to login in the Admin ui
+const authStrategy = keystone.createAuthStrategy({
+  type: PasswordAuthStrategy,
+  list: 'User',
+  config: {
+    identityField: 'email',
+    secretField: 'password',
+  },
+});
+
+//add the authStrategy to the keystone export
+module.exports = {
+  keystone,
+  apps: [
+    new GraphQLApp(),
+    new AdminUIApp({
+      name: PROJECT_NAME,
+      enableDefaultRoute: true,
+      authStrategy,
+    }),
+  ],
+};
+```
+
+Now, with the password access control mechanism, all users with accounts will be able to access the Admin UI. For restrict the access to a Admin user, we need to use the the isAccessAllowed config option. This function it must return either true or false.
+
+```JS
+
+module.exports = {
+  keystone,
+  apps: [
+    new GraphQLApp(),
+    new AdminUIApp({
+      name: PROJECT_NAME,
+      enableDefaultRoute: true,
+      authStrategy,
+      // Add isAccessAllowed to restrict the access only for admin user
+      isAccessAllowed: ({ authentication: { item: user, listKey: list } }) => !!user && !!user.isAdmin
+    }),
+  ],
+};
+
+```
+
+admin will have to logginto have access to the adminUI.
+This access control will not restrict the API access.
+
+### Access control to the API
+
+finally, the index.js file with admin, login access control to the AdminUI and the API
+
+```JS
+const dotenv = require('dotenv').config()
+const { Keystone } = require('@keystonejs/keystone');
+const { PasswordAuthStrategy }= require('@keystonejs/auth-password')
+const { GraphQLApp } = require('@keystonejs/app-graphql');
+const { AdminUIApp } = require('@keystonejs/app-admin-ui');
+const { MongooseAdapter: Adapter } = require('@keystonejs/adapter-mongoose');
+const PROJECT_NAME = 'keystone101';
+const PostSchema = require('./lists/Post')
+const AuthorSchema = require('./lists/Author')
+const UserSchema = require('./lists/User')
+const TodoSchema = require('./lists/Todo')
+
+/**
+ * You've got a new KeystoneJS Project! Things you might want to do next:
+ * - Add adapter config options (See: https://keystonejs.com/keystonejs/adapter-mongoose/)
+ * - Select configure access control and authentication (See: https://keystonejs.com/api/access-control)
+ */
+
+const adapterConfig = { mongoUri: process.env.MONGO_URI };
+
+const keystone = new Keystone({
+  adapter: new Adapter(adapterConfig),
+  cookieSecret: process.env.COOKIE_SECRET
+});
+
+const isAdmin =  ({ authentication: { item: user, listKey: list } }) => !!user && !!user.isAdmin
+
+const isLoggedIn =  ({ authentication: { item: user, listKey: list } }) => !!user
+
+keystone.createList('Post', {
+  fields: PostSchema.fields,
+  access: {
+    read: true,
+    create: isLoggedIn,
+    update: isLoggedIn,
+    delete: isLoggedIn,
+  },
+})
+
+keystone.createList('Authorz', AuthorSchema)
+keystone.createList('User', {
+  fields: UserSchema.fields,
+  access: {
+    read: true,
+    create: isAdmin,
+    update: isAdmin,
+    delete: isAdmin,
+  },
+})
+keystone.createList('Todo', TodoSchema);
+
+const authStrategy = keystone.createAuthStrategy({
+  type: PasswordAuthStrategy,
+  list: 'User',
+  config: {
+    identityField: 'email',
+    secretField: 'password',
+  },
+});
+
+
+
+module.exports = {
+  keystone,
+  apps: [
+    new GraphQLApp(),
+    new AdminUIApp({
+      name: PROJECT_NAME,
+      enableDefaultRoute: true,
+      authStrategy,
+      isAccessAllowed: isAdmin
+    }),
+  ],
+};
 
 ```
 
@@ -197,269 +368,3 @@ name
 "id": "6030becc6da9b240fc43efff",
 "order": ["name_DESC"]
 }
-
-## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
-
-## Folder structure
-
-📦my-app
-
-┣ 📂pages
-
-┃ ┣ 📂api
-
-┃ ┃ ┗ 📜hello.js
-
-┃ ┣ 📜index.js
-
-┃ ┗ 📜_app.js
-
-┣ 📂public
-
-┃ ┣ 📜favicon.ico
-
-┃ ┗ 📜vercel.svg
-
-┣ 📂styles
-
-┃ ┣ 📜globals.css
-
-┃ ┗ 📜Home.module.css
-
-┣ 📜.gitignore
-
-┣ 📜package-lock.json
-
-┣ 📜package.json
-
-┗ 📜README.md
-
-## Pages
-
-All React Component exported from a .js, .jsx, .ts, or .tsx file in the pages directory will become a page. Each page is associeted with a route based on its own file name.
-
-**Example:**
-If you create a React Component like below
-
-```JS
-const welcome = () => {
-  return (
-    <div>
-      Welcome
-    </div>
-  )
-}
-
-export default welcome
-
-```
-
-it will be accessible at _/welcome_ with no need to import a router
-
-## Layout
-
-The _\_app.js_ file wraps around all of your page components, so it's a good place to put our Layout component.
-
-_page/\_app.js_
-
-```JS
-import Layout from '../components/Layout'
-import '../styles/globals.css'
-
-function MyApp({ Component, pageProps }) {
-  return (
-    <Layout>
-        <Component {...pageProps} />
-    </Layout>
-  )
-}
-
-export default MyApp
-```
-
-```JS
-import React from 'react'
-
-const Layout = ({children}) => {
-  return (
-    <div>
-      Header
-        <div className="main">
-          {children}
-        </div>
-      Footer
-    </div>
-  )
-}
-
-export default Layout
-```
-
-## Head Component
-
-Head is a 'next/head' component that can be imported from any Next.js page component to add information to the page header. In this component you can customize the page title, all of the website metadata, page keywords, viewport settings
-
-```HTML
- <Head>
-    <title>NextJS 101</title>
-    <meta charSet="utf-8" />
-    <meta name="viewport" content="initial-scale=1.0, width=device-width" />
-  </Head>
-```
-
-This should be imported in each page, but we can create a Layout with the Head component in it.
-_e.g:.:_
-
-```JS
-import Head from 'next/head'
-
-const Meta = ({ title, keywords, description }) => {
-  return (
-    <Head>
-      <meta name='viewport' content='width=device-width, initial-scale=1' />
-      <meta name='keywords' content={keywords} />
-      <meta name='description' content={description} />
-      <meta charSet='utf-8' />
-      <link rel='icon' href='/favicon.ico' />
-      <title>{title}</title>
-    </Head>
-  )
-}
-
-Meta.defaultProps = {
-  title: 'My App Title',
-  keywords: 'nextjs, react',
-  description: 'Next From scratch',
-}
-
-export default Meta
-
-```
-
-## Link component
-
-Similar to what we would do with React-Router we use Link to navigate between pages imported from next
-import Link from "next/link";
-
-```JS
-<Link href="/">
-  <a>home</a>
-</Link>
-```
-
-With that in mind, now we can create a Nav component to navigate through our links and then imported in the Layout component
-
-```js
-import Link from "next/link";
-import { useRouter } from "next/router";
-
-const Nav = () => {
-  const router = useRouter();
-  return (
-    <nav className="nav">
-      <ul>
-        <li className={router.pathname == "/" ? "active" : ""}>
-          <Link href="/">
-            <a>home</a>
-          </Link>
-        </li>
-        <li className={router.pathname == "/welcome" ? "active" : ""}>
-          <Link href="/welcome">
-            <a>Welcome</a>
-          </Link>
-        </li>
-      </ul>
-    </nav>
-  );
-};
-
-export default Nav;
-```
-
-## Image Component
-
-The Next.js Image component allow you're to take advantage of lazy loading as well as optimizations around image sizes.
-Next.js optimizes images on-demand, as users request them. Unlike static site generators and static-only solutions, your build times aren't increased, whether shipping 10 images or 10 million images.
-
-```JS
-import Image from 'next/image'
-
-const Nav = () => {
-
-  const router = useRouter()
-  return (
-    <div className="nav">
-      <Image src="/logo.png"  alt="site logo"  width={90} height={50}/>
-    </div>
-  )
-}
-
-export default Nav
-
-```
-
-## Data Fetching and Rendering
-
-Next.js provide two forms of pre-rendering: Static Generation and Server-side that differ when generates the HTML for a page.
-
-Static Generation is the pre-rendering method that generates the HTML at build time. The pre-rendered HTML is then reused on each request.
-Server-side Rendering is the pre-rendering method that generates the HTML on each request
-In the Static Generation, the HTML pages are rendered at build time.
-
-### Static Generation with getStaticProps
-
-```JS
-export async function getStaticProps() {
-  const res = await fetch(`https:....`)
-  const data = await res.json()
-
-  return {
-    props: {
-      data
-    }
-  }
-}
-```
-
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out the Vercel [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
-
-# KeystoneJS Blank Starter Template
-
-You've created a KeystoneJS project! This project contains an AdminUI and GraphQL App.
-
-You probably want to add Lists, Authentication, Access control and a front-end application.
-
-## Running the Project.
-
-To run this project first run `npm install`. Note: If you generated this project via the Keystone cli step this has been done for you \\o/.
-
-Once running the Keystone Admin UI is reachable via: `localhost:3000/admin`.
-
-## Next steps
-
-This example has no front-end application but you can build your own using the GraphQL API (`http://localhost:3000/admin/graphiql`).
